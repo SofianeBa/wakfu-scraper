@@ -1,4 +1,5 @@
 import json
+import subprocess
 
 version = "1.78.1.7"
 chemin = "../Ressources/"
@@ -118,37 +119,13 @@ def find_effects(item):
     for value in item["definition"]["equipEffects"]:
         params = value["effect"]["definition"]["params"]
         description = find_effect_desc(value["effect"]["definition"]["actionId"])
-        print(description)
-        # Boucle pour remplacer tous les paramètres dans la description
-        i = 1
-        while "[#" in description:
-            # Recherche de la prochaine occurrence de [#i]
-            start = description.find("[#")
-            end = description.find("]", start)
-            if end == -1:
-                break
-            placeholder = description[start:end+1]
-            
-            print(i)
-            print(params)
-            # Calcul de la valeur de remplacement pour [#i]
-            if i*2-1 < len(params) and i*2-2 < len(params):
-                result_value = params[i*2-1] * 6.0 + params[i*2-2]
-            else:
-                exit()
-            
-            # Remplacement de [#i] par la valeur calculée
-            description = description.replace(placeholder, str(result_value))
-            print(description)
-            i += 1
+        decoded_description = subprocess.run(["node", "./Decoder/decoder.js", description, json.dumps(params),str(item["definition"]["item"]["level"])], capture_output=True, text=True, encoding='utf-8')
 
-        #result_value = params[1] * 6.0 + params[0]
-        #result = description.replace("[#1]", str(result_value))
         if (description != "Inconnu"):
             effect = {}
             effect["ID"] = value["effect"]["definition"]["actionId"]
             effect["Paramètres"] = params
-            effect["Effet"] = description
+            effect["Effet"] = decoded_description.stdout.strip()
             effects.append(effect)
     if(effects):
         return effects
