@@ -1,5 +1,49 @@
 import json
 import subprocess
+from selenium import webdriver
+from lxml import html
+import time
+from fake_useragent import UserAgent
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+
+
+
+options = Options()
+ua = UserAgent()
+userAgent = ua.random
+print(userAgent)
+options.add_argument(f'user-agent={userAgent}')
+options.add_argument('--headless')
+options.add_argument('--disable-extensions')
+options.add_argument('--disable-gpu')
+options.add_argument('--no-sandbox')
+options.add_argument('disable-infobars')
+options.add_argument('--disable-dev-shm-usage')
+
+service = Service(r'C:\Users\sofia\Downloads\chromedriver_win32\chromedriver.exe')
+service.start()
+browser = webdriver.Chrome(options=options, service=service)
+url = "https://www.wakfu.com/fr/mmorpg/encyclopedie/armures/"
+#monstres = tree.xpath("//div[@class='ak-container ak-content-list ak-displaymode-image-col']/div[@class='row ak-container']/div[@class='ak-column ak-container col-xs-12 col-md-6']/div/div/div/div[@class='ak-content']/div/a/span/text()")
+#pourcentages = tree.xpath("//div[@class='ak-container ak-content-list ak-displaymode-image-col']/div[@class='row ak-container']/div/div/div/div/div[@class='ak-aside']/text()")
+
+#print(driver.page_source)
+#driver.quit()
+
+
+start_time = time.time()
+
+#options = webdriver.ChromeOptions()
+#options.add_argument('--disable-extensions')
+#options.add_argument('--disable-gpu')
+#options.add_argument('--no-sandbox')
+#options.add_argument('start-maximized')
+#options.add_argument('disable-infobars')
+#options.add_argument('--disable-dev-shm-usage')
+#options.add_argument('--remote-debugging-port=9222')
+#url = "https://www.wakfu.com/fr/mmorpg/encyclopedie/armures/"
+#browser = webdriver.Chrome(chrome_options=options)
 
 version = "1.78.1.7"
 chemin = "../Ressources/"
@@ -81,7 +125,7 @@ def find_recipe_ingredients(recipe_id):
         if(value["recipeId"] == recipe_id):
             ingredient["item_id"] = value["itemId"]
             #This name search only work with equipments... To make it work with ressources, we have to find where they are hidden (not in the jsons...)
-            ingredient["item_name"] = find_item_name(value["itemId"])
+            ingredient["item_name"] = find_item_name_scraper(ingredient["item_id"])
             ingredient["quantity"] = value["quantity"]
             ingredients.append(ingredient)
     if len(ingredients):
@@ -131,13 +175,35 @@ def find_effects(item):
         return effects
     return "Inconnu"
 
-item["ID"] = items[1000]["definition"]["item"]["id"]
-item["Nom"] = items[1000]["title"]["fr"]
-item["Niveau"] = items[1000]["definition"]["item"]["level"]
-item["Type"] = find_item_type(items[1000])
-item["Rareté"] = rarity[items[1000]["definition"]["item"]["baseParameters"]["rarity"]]
-item["Description"] = items[1000]["description"]["fr"]
-item["Effet"] = find_effects(items[1000])
+def give_html_source(url):
+    browser.get(url)
+    return browser.page_source
+
+def find_drop(item_id):
+    #Let's find the drop on the internet
+    html_source = give_html_source(url+str(item_id))
+    tree = html.fromstring(html_source)
+    monstres = tree.xpath("//div[@class='ak-container ak-content-list ak-displaymode-image-col']/div[@class='row ak-container']/div[@class='ak-column ak-container col-xs-12 col-md-6']/div/div/div/div[@class='ak-content']/div/a/span/text()")
+    pourcentages = tree.xpath("//div[@class='ak-container ak-content-list ak-displaymode-image-col']/div[@class='row ak-container']/div/div/div/div/div[@class='ak-aside']/text()")
+    drop_list = {}
+    for i in range(len(monstres)):
+        drop_list[monstres[i]] = pourcentages[i]
+    return drop_list
+
+def find_item_name_scraper(item_id):
+    html_source = give_html_source(url+str(item_id))
+    tree = html.fromstring(html_source)
+    name = tree.xpath("//div[@class='container ak-main-container']/div[@class='ak-main-content']/div[@class='ak-main-page']/div/main/div[@class='ak-container ak-main-center']/div/div[@class='ak-title-container ak-backlink']/h1/text()")[1].strip()
+    return name
+
+item["ID"] = items[1001]["definition"]["item"]["id"]
+item["Nom"] = items[1001]["title"]["fr"]
+item["Niveau"] = items[1001]["definition"]["item"]["level"]
+item["Type"] = find_item_type(items[1001])
+item["Rareté"] = rarity[items[1001]["definition"]["item"]["baseParameters"]["rarity"]]
+item["Description"] = items[1001]["description"]["fr"]
+item["Effet"] = find_effects(items[1001])
+
 
 id_recette = find_recipe_id(item["ID"])
 if id_recette < 0:
@@ -147,15 +213,12 @@ else:
     item["Recette"]["ID"] = id_recette
     item["Recette"]["Métier"] = find_recipe_job(id_recette)
     item["Recette"]["Ingrédients"] = find_recipe_ingredients(id_recette)
-    
 
-
-#Drop (monstres + pourcentages) A IMPLEMENTER PLUS TARD (besoin de scrap le site, non présent dans json)
-
-#Recette : {type : Boulanger, Niveau : 53, Ingrédients : [{id objet : 1, nom objet : eau, quantité : 10}]}
-#Nom des objets à récupérer via scraping
+item["Drop"] = find_drop(item["ID"])
 
 
 
-
+browser.quit()
 print(item)
+
+print("--- %s seconds ---" % (time.time() - start_time))
